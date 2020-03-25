@@ -16,8 +16,8 @@ sc.setLogLevel("ERROR")
 
 # Total number of users 11270
 p = 13591
-m = 64
-number_of_hashes = 64
+m = 11270
+number_of_hashes = 256
 a = random.sample(range(1, p), number_of_hashes)
 b = random.sample(range(0, p), number_of_hashes)
 
@@ -48,11 +48,11 @@ def minhash(vector, a, b, p, m):
 
 def hash_bands(x):
     doc_id, sig = x
-    b = 16
+    b = 64
     r = 4
     output = []
     for i in range(0, b):
-        output.append(((i, hash(frozenset(sig[r*i:(i+1)*r]))), doc_id))
+        output.append(((i, hash(tuple(sig[r*i:(i+1)*r]))), doc_id))
     return output
 
 
@@ -88,6 +88,33 @@ def save_output(output, file_path):
             f.write(pairs)
     return 
 
+def precision_recall(gt_path, pred_path):
+    gt_set = set()
+    with open(gt_path, 'rt') as file:
+        line = file.readline()
+        line = file.readline()
+        while(line):
+            gt_set.add(line)
+            line = file.readline()
+    
+    pred_set = set() 
+    with open(pred_path, 'rt') as file:
+        line = file.readline()
+        line = file.readline()
+        while(line):
+            pred_set.add(line)
+            line = file.readline()
+            
+            
+    tp = len(gt_set.intersection(pred_set))
+    fp = len(pred_set - gt_set)
+    fn = len(gt_set - pred_set)
+    
+    print("precision", tp/(tp+fp))
+    print("recall", tp/(tp+fn))
+    
+    
+
 if __name__ == '__main__':
     rdd = read_business(sys.argv[1].strip())
     signatures = rdd.collect()
@@ -96,3 +123,4 @@ if __name__ == '__main__':
     candidates = business_sig.flatMap(hash_bands).groupByKey().map(lambda x: (x[0], list(x[1]))).filter(lambda x: len(x[1]) > 1)
     similar_pairs = candidates.flatMap(lambda x: find_similarity(x, index)).map(lambda pairs: ','.join([str(x) for x in pairs])+'\n').distinct().collect()
     save_output(similar_pairs, sys.argv[2].strip())
+    precision_recall('./data/pure_jaccard_similarity.csv', sys.argv[2].strip())
